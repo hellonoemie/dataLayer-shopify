@@ -245,7 +245,7 @@ applyBindings(defaultBindings, __bva__);
         'country'     : '{{customer_address.country}}',
         'phone'       : '{{customer_address.phone}}',
         'totalOrders' : '{{customer.orders_count}}',
-        'totalSpent'  : '{{customer.total_spent}}'
+        'totalSpent'  : '{{customer.total_spent | money_without_currency}}'
       },
       {% else %}
       'logState' : "Logged Out",
@@ -297,7 +297,7 @@ applyBindings(defaultBindings, __bva__);
     if(__bva__.debug){
       console.log("Log State"+" :"+JSON.stringify(logState, null, " "));
     }
-
+  
     /*DATALAYER: Homepage
     --------------------------- */
 
@@ -310,7 +310,7 @@ applyBindings(defaultBindings, __bva__);
       if(__bva__.debug){
         console.log("Homepage"+" :"+JSON.stringify(homepage, null, " "));
       }
-    }
+    }	
 
     /* DATALAYER: Blog Articles
     ---------------------------
@@ -503,7 +503,6 @@ applyBindings(defaultBindings, __bva__);
     __bva__products = [];
 
     {% for line_item in checkout.line_items %}
-
     __bva__products.push({
       'id'          : '{{line_item.product_id}}',
       'sku'         : '{{line_item.sku}}',
@@ -518,17 +517,37 @@ applyBindings(defaultBindings, __bva__);
     });
 
     {% endfor %}
+ 	
+  	if (document.location.pathname.startsWith("/apps/bread/orders/confirmation/")) {
+      var orderNumber = $('.order-info-label').next().html();
+      var orderSubtotal = $('.order-total').html().split('<br>')[0].replace(/\s|\$/g, '');
+      var orderTax = $('.order-total').html().split('<br>')[1].replace(/\s|\$/g, '');
+      var orderShipping = $('.order-total').html().split('<br>')[2].replace(/\s|\$/g, '');
+      var orderTotal = $('.order-total strong').html().replace(/\s|\$/g, '');
+	} else if (('{{checkout.subtotal_price}}' == false && document.location.href.indexOf("thank_you") > -1) || ('{{checkout.subtotal_price}}' == false && document.location.href.indexOf("orders") > -1 )) {
+      var orderSubtotal = $('.total-line--subtotal .order-summary__emphasis').html().replace(/\s|\$|\,/g, '').toString();
+      var orderTax = $('.total-line--taxes .order-summary__emphasis').html().replace(/\s|\$|\,/g, '').toString();
+      var orderShipping = $('.total-line--shipping .order-summary__emphasis').html().replace(/\s|\$|\,/g, '').toString();
+      var orderTotal = $('.total-line__price .payment-due__price').html().replace(/\s|\$|\,/g, '').toString();
+    } else {
+      var orderSubtotal = '{{checkout.subtotal_price |  money_without_currency| remove: ","}}'
+      var orderTax = '{{checkout.tax_price |  money_without_currency| remove: ","}}'
+      var orderShipping = '{{checkout.shipping_price |  money_without_currency| remove: ","}}';
+      var orderTotal = '{{checkout.total_price |  money_without_currency| remove: ","}}';
+    }
+  
     transactionData = {
       'transactionNumber'      : '{{checkout.order_id}}',
       'transactionId'          : '{{checkout.order_number}}',
       'transactionAffiliation' : '{{shop.name}}',
-      'transactionTotal'       : '{{checkout.total_price |  money_without_currency| remove: ","}}',
-      'transactionTax'         : '{{checkout.tax_price |  money_without_currency| remove: ","}}',
-      'transactionShipping'    : '{{checkout.shipping_price |  money_without_currency| remove: ","}}',
-      'transactionSubtotal'    : '{{checkout.subtotal_price |  money_without_currency| remove: ","}}',
+      'transactionTotal'       : orderTotal,
+      'transactionTax'         : orderTax,
+      'transactionShipping'    : orderShipping,
+      'transactionSubtotal'    : orderSubtotal,
+      'firstTimeAccessed'      : {% if first_time_accessed %}'true'{% else %}'false'{% endif %},
       {% for discount in checkout.discounts %}
       'promoCode' : '{{discount.code}}',
-      'discount'  : '{{discount.amoun t | money_without_currency}}',
+      'discount'  : '{{discount.amount | money_without_currency}}',
       {% endfor %}
 
       'products': __bva__products
@@ -590,7 +609,7 @@ applyBindings(defaultBindings, __bva__);
           }
         }
       }
-    }
+    }  
 
     /* DATALAYER: All Pages
     -----------------------
