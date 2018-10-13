@@ -66,16 +66,16 @@ getURLParams = function(name, url){
 __bva__ = {
   dynamicCart: true,  // if cart is dynamic (meaning no refresh on cart add) set to true
   debug: true, // if true, console messages will be displayed
-  cart: null,
+  cart: true,
   wishlist: null,
-  removeCart: null
+  removeCart: true
 };
 
 customBindings = {
-  cartTriggers: [],
-  viewCart: [],
-  removeCartTrigger: [],
-  cartVisableSelector: [],
+  cartTriggers: ['#add-to-cart,.button--cart,#bread-button,button[data-label="Add to Cart"]'],
+  viewCart: ['#edit-cart'],
+  removeCartTrigger: ['.mini-cart__remove,.icon-cross__container'],
+  cartVisableSelector: ['.header__cart-count'],
   promoSubscriptionsSelectors: [],
   promoSuccess: [],
   ctaSelectors: [],
@@ -92,7 +92,7 @@ customBindings = {
 defaultBindings = {
   cartTriggers: ['form[action="/cart/add"] [type="submit"],.add-to-cart,.cart-btn'],
   viewCart: ['form[action="/cart"],.my-cart,.trigger-cart,#mobileCart'],
-  removeCartTrigger: ['[href*="/cart/change"]'],
+  removeCartTrigger: ['[rv-href*="index | decreaseQuantityUrl item"]'],
   cartVisableSelector: ['.inlinecart.is-active,.inline-cart.is-active'],
   promoSubscriptionsSelectors: [],
   promoSuccess: [],
@@ -241,11 +241,14 @@ applyBindings(defaultBindings, __bva__);
         'street'      : '{{customer_address.street}}',
         'city'        : '{{customer_address.city}}',
         'province'    : '{{customer_address.province}}',
+        'provinceCode': '{{customer_address.province_code}}',
         'zip'         : '{{customer_address.zip}}',
         'country'     : '{{customer_address.country}}',
+        'countryCode' : '{{customer_address.country_code}}',
         'phone'       : '{{customer_address.phone}}',
         'totalOrders' : '{{customer.orders_count}}',
-        'totalSpent'  : '{{customer.total_spent | money_without_currency}}'
+        'totalSpent'  : '{{customer.total_spent | money_without_currency}}',
+        'orderIds'    : '{% for order in customer.orders %}{% if forloop.last == true %}{{ order.id }},{% else %}{{ order.id }}{% endif%}{% endfor %}',
       },
       {% else %}
       'logState' : "Logged Out",
@@ -253,7 +256,8 @@ applyBindings(defaultBindings, __bva__);
       {% endif %}
       'firstLog'      : firstLog,
       'customerEmail' : '{{customer.email}}',
-      'timestamp'     : Date.now(),  
+      'timestamp'     : Date.now(),
+      'hasAccount'    : '{{customer.has_account}}',
       {% if customer.orders_count > 2 %}
       'customerType'       : 'Returning',
       'customerTypeNumber' : '0',
@@ -337,19 +341,22 @@ applyBindings(defaultBindings, __bva__);
     {% if template contains 'collection' %}
     var product = {
       'products': [
-      {% for product in collection.products %}{
-        'id'              : '{{ product.id }}',
+      {% for product in collection.products %}       
+        {
+        'product_id'	  : '{{ product.id }}',
+        'id'	  : '{{ product.id }}',
         'sku'             : '{{product.selected_variant.sku}}',
         'variantId'       : '{{product.selected_variant.variant.id}}',
-        'productType'     : "{{product.type}}",
-        'name'            : "{{product.title}}",
+        'productType'     : '{{product.type}}',
+        'name'            : '{{product.title}}',
         'price'           : '{{product.price | money_without_currency | remove: ","}}',
-        'imageURL'        : "https:{{product.featured_image.src|img_url:'grande'}}", 
+        'image_url'        : 'https:{{product.featured_image|img_url:'grande'}}', 
         'productURL'      : '{{shop.secure_url}}{{product.url}}',
         'brand'           : '{{shop.name}}',              
         'comparePrice'    : '{{product.compare_at_price_max|money_without_currency}}',
         'categories'      : {{product.collections|map:"title"|json}},
-        'currentCategory' : "{{collection.title}}",
+        'currentCategory' : '{{collection.title}}',
+        'currentCategoryId': '{{collection.id}}',
         'productOptions'  : {
           {% for option in product.options_with_values %}
           {% for value in option.values %}
@@ -384,19 +391,21 @@ applyBindings(defaultBindings, __bva__);
       sku = '';
       var product = {
         'products': [{
-          'id'              : '{{product.id}}',
-          'sku'             : '{{product.selected_variant.sku}}',
-          'variantId'       : '{{product.selected_variant.variant.id}}',
-          'productType'     : "{{product.type}}",
+          'product_id'      : '{{product.id}}',
+          'id'      : '{{product.id}}',
+          'sku'             : '{{product.selected_or_first_available_variant.sku}}',
+          'variant'       : '{{product.selected_or_first_available_variant.id}}',
+          'productType'     : '{{product.type}}',
           'name'            : '{{product.title}}',
           'price'           : '{{product.price | money_without_currency | remove: ","}}',
           'description'     : '{{product.description | strip_newlines | strip_html | escape }}',
-          'imageURL'        : "https:{{product.featured_image.src|img_url:'grande'}}", 
-          'productURL'      : '{{shop.secure_url}}{{product.url}}',
           'brand'           : '{{shop.name}}',              
           'comparePrice'    : '{{product.compare_at_price_max|money_without_currency}}',
           'categories'      : {{product.collections|map:"title"|json}},
-          'currentCategory' : "{{collection.title}}",
+          'category'		: '{{collection.title}}',
+          'currentCategory' : '{{collection.title}}',
+          'productURL'      : '{{shop.secure_url}}{{product.url}}',
+          'image_url'        : "https:{{product.featured_image|img_url:'grande'}}", 
           'productOptions'  : {
             {% for option in product.options_with_values %}
             {% for value in option.values %}
@@ -435,12 +444,15 @@ applyBindings(defaultBindings, __bva__);
     {% if template contains 'cart' %}
     var cart = {
       'products':[{% for line_item in cart.items %}{
+        'product_id': '{{line_item.product_id}}',
         'id'       : '{{line_item.product_id}}',
         'sku'      : '{{line_item.sku}}',
         'variant'  : '{{line_item.variant_id}}',
         'name'     : '{{line_item.title}}',
         'price'    : '{{line_item.price | money_without_currency}}',
-        'quantity' : '{{line_item.quantity}}'
+        'quantity' : '{{line_item.quantity}}',
+        'image_url': 'https:{{line_item | img_url: 'grande'}}',
+        'url'	   : 'https://www.hellonoemie.com{{line_item.url}}'
       },{% endfor %}],
       'pageType' : 'Cart',
       'event'    : 'Cart'
@@ -464,12 +476,15 @@ applyBindings(defaultBindings, __bva__);
         var removeFromCart = {
           'products': __bva__.removeCart.items.map(function (line_item) {
             return {
+              'product_id': line_item.product_id,
               'id'       : line_item.product_id,
               'sku'      : line_item.sku,
               'variant'  : line_item.variant_id,
               'name'     : line_item.title,
               'price'    : (line_item.price/100),
-              'quantity' : line_item.quantity
+              'quantity' : line_item.quantity,
+              'image_url': line_item.image_url,
+              'url'      : line_item.url
             }
           }),
           'pageType' : 'Remove from Cart',
@@ -504,6 +519,7 @@ applyBindings(defaultBindings, __bva__);
 
     {% for line_item in checkout.line_items %}
     __bva__products.push({
+      'product_id'  : '{{line_item.product_id}}',
       'id'          : '{{line_item.product_id}}',
       'sku'         : '{{line_item.sku}}',
       'variantId'   : '{{line_item.variant_id}}',
@@ -512,7 +528,7 @@ applyBindings(defaultBindings, __bva__);
       'price'       : '{{line_item.price | money_without_currency| remove: ","}}',
       'quantity'    : '{{line_item.quantity}}',
       'description' : '{{line_item.product.description | strip_newlines | strip_html | escape }}',
-      'imageURL'    : "https:{{line_item.product.featured_image.src|img_url:'grande'}}", 
+      'image_url'    : "https:{{line_item.product.featured_image.src|img_url:'grande'}}", 
       'productURL'  : '{{shop.secure_url}}{{line_item.product.url}}'
     });
 
@@ -530,11 +546,21 @@ applyBindings(defaultBindings, __bva__);
       var orderShipping = $('.total-line--shipping .order-summary__emphasis').html().replace(/\s|\$|\,/g, '').toString();
       var orderTotal = $('.total-line__price .payment-due__price').html().replace(/\s|\$|\,/g, '').toString();
     } else {
-      var orderSubtotal = '{{checkout.subtotal_price |  money_without_currency| remove: ","}}'
-      var orderTax = '{{checkout.tax_price |  money_without_currency| remove: ","}}'
-      var orderShipping = '{{checkout.shipping_price |  money_without_currency| remove: ","}}';
-      var orderTotal = '{{checkout.total_price |  money_without_currency| remove: ","}}';
+      var orderSubtotal = {% if checkout.subtotal_price %}{{checkout.subtotal_price |  money_without_currency| remove: ","}}{% else %}0{% endif %};
+      var orderTax = {% if checkout.tax_price %}{{checkout.tax_price |  money_without_currency| remove: ","}}{% else %}0{% endif %};
+      var orderShipping = {% if checkout.shipping_price %}{{checkout.shipping_price |  money_without_currency| remove: ","}}{% else %}0{% endif %};
+      var orderTotal = {% if checkout.total_price %}{{checkout.total_price |  money_without_currency| remove: ","}}{% else %}0{% endif %};
     }
+
+      var orderGift = {% assign giftamount = checkout.gift_cards_amount|money_without_currency | remove: ',' %}{% if checkout.gift_cards_amount %}{{ giftamount }}{% else %}0{% endif %};
+      var orderSubtotalMinusGift = {{checkout.subtotal_price | money_without_currency | minus: checkout.gift_cards_amount}};
+      var orderDiscountTotal = {% if giftamount %}{% if checkout.discounts %}{% assign discount_total = checkout.discounts_amount | divided_by: 100 | plus: giftamount %}{% else %}{% assign discount_total = giftamount %}{% endif %}{% else %}{% assign discount_total = checkout.discounts_amount %}{% endif %}{% assign dtotal = discount_total | times: 100 %}{{ dtotal }};
+      var orderPriceList = 	'{% for item in checkout.line_items %}{% assign total_cartprice = checkout.subtotal_price %}{% assign ratio = dtotal | divided_by: total_cartprice %}{% assign ratioless = 1 | minus: ratio %}{% assign final_item_price = item.price | times: ratioless %}{% if forloop.last == true %}{{ final_item_price | money_without_currency | remove: ',' }}{% else %}{{final_item_price | money_without_currency | remove: ',' | append: ','}}{% endif %}{% endfor %}';
+      var orderQuantityList = '{% for item in checkout.line_items %}{% if forloop.last == true %}{{ item.quantity }}{% else %}{{ item.quantity | append: ','}}{% endif %}{% endfor %}';
+      var orderCouponCode = '{% for discount in checkout.discounts %}{% if forloop.last == true %}{{ discount.code }}{% else %}{{ discount.code | append: ',' }}{% endif %}{% endfor %}';                                    
+  	  var newCustomer = {% if customer.orders_count > 1 %}0{% else %}'true'{% endif %};
+      var SKUList = '{% for item in checkout.line_items %}{% if forloop.last == true %}{{ item.sku }}_{{item.variant_id}}{% else %}{{item.sku}}_{{ item.variant_id | append: ','}}{% endif %}{% endfor %}';
+  
   
     transactionData = {
       'transactionNumber'      : '{{checkout.order_id}}',
@@ -544,7 +570,17 @@ applyBindings(defaultBindings, __bva__);
       'transactionTax'         : orderTax,
       'transactionShipping'    : orderShipping,
       'transactionSubtotal'    : orderSubtotal,
+      'transactionSKUList'	   : SKUList,
+      'transactionGiftAmount'  : orderGift,
+      'transactionTotalMinusGift': orderSubtotal - orderGift,
+      'transactionPriceList'   : orderPriceList,
+      'transactionQuantityList': orderQuantityList,
+      'transactionCouponCode'  : orderCouponCode,
+      'transactionDiscountTotal': orderDiscountTotal,
+      'transactionShippingMethod': '{{checkout.shipping_method.title}}',
+      'transactionPaymentMethod': '{{transaction.payment_gateway}}',
       'firstTimeAccessed'      : {% if first_time_accessed %}'true'{% else %}'false'{% endif %},
+      'newCustomer'            : newCustomer,
       {% for discount in checkout.discounts %}
       'promoCode' : '{{discount.code}}',
       'discount'  : '{{discount.amount | money_without_currency}}',
@@ -656,10 +692,12 @@ applyBindings(defaultBindings, __bva__);
         jQuery.getJSON('/cart.js', function (response) {
         // --------------------------------------------- get Json response 
           __bva__.cart = response;
+          console.log(response);
           var cart = {
             'products': __bva__.cart.items.map(function (line_item) {
               return {
-                'id'       : line_item.id,
+                'product_id': line_item.id,
+                'id': line_item.id,
                 'sku'      : line_item.sku,
                 'variant'  : line_item.variant_id,
                 'name'     : line_item.title,
@@ -708,6 +746,7 @@ applyBindings(defaultBindings, __bva__);
                 var removeFromCart = {
                   'products': __bva__.removeCart.items.map(function (line_item) {
                     return {
+                      'product_id'       : line_item.id,
                       'id'       : line_item.id,
                       'sku'      : line_item.sku,
                       'variant'  : line_item.variant_id,
@@ -743,6 +782,7 @@ applyBindings(defaultBindings, __bva__);
         var cart = {
           'products': __bva__.cart.items.map(function (line_item) {
             return {
+              'product_id'       : line_item.id,
               'id'       : line_item.id,
               'sku'      : line_item.sku,
               'variant'  : line_item.variant_id,
@@ -773,7 +813,7 @@ applyBindings(defaultBindings, __bva__);
             var cart = {
               'products': __bva__.cart.items.map(function (line_item) {
                 return {
-                  'id'       : line_item.id,
+                  'product_id'       : line_item.product_id,
                   'sku'      : line_item.sku,
                   'variant'  : line_item.variant_id,
                   'name'     : line_item.title,
@@ -858,7 +898,8 @@ applyBindings(defaultBindings, __bva__);
                 var removeFromCart = {
                   'products': __bva__.removeCart.items.map(function (line_item) {
                     return {
-                      'id'       : line_item.id,
+                      'product_id'       : line_item.product_id,
+                      'id'       : line_item.product_id,
                       'sku'      : line_item.sku,
                       'variant'  : line_item.variant_id,
                       'name'     : line_item.title,
