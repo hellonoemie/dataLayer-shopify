@@ -235,8 +235,8 @@ applyBindings(defaultBindings, __bva__);
       'customerEmail' : '{{customer.email}}',
       'logState'      : "Logged In",
       'customerInfo'  : {
-        'firstName'   : '{{customer.first_name}}',
-        'lastName'    : '{{customer.last_name}}',
+        'firstName'   : '{{customer_address.first_name}}',
+        'lastName'    : '{{customer_address.last_name}}',
         'address1'    : '{{customer_address.address1}}',
         'address2'    : '{{customer_address.address2}}',
         'street'      : '{{customer_address.street}}',
@@ -560,7 +560,7 @@ applyBindings(defaultBindings, __bva__);
 
       var orderGift = {% assign giftamount = checkout.gift_cards_amount|money_without_currency | remove: ',' %}{% if checkout.gift_cards_amount %}{{ giftamount }}{% else %}0{% endif %};
       var orderSubtotalMinusGift = {{checkout.subtotal_price | money_without_currency | minus: checkout.gift_cards_amount}};
-      var orderDiscountTotal = {% if giftamount %}{% if checkout.discounts %}{% assign discount_total = checkout.discounts_amount | divided_by: 100 | plus: giftamount %}{% else %}{% assign discount_total = giftamount %}{% endif %}{% else %}{% assign discount_total = checkout.discounts_amount %}{% endif %}{% assign dtotal = discount_total | times: 100 %}{{ dtotal }};
+      var orderDiscountTotal = {% assign gift_total = gift_card.balance | money_without_currency %}{% assign discount_total = checkout.discounts_amount | money_without_currency | plus: gift_total %}{{discount_total}};
       var orderPriceList = 	'{% for item in checkout.line_items %}{% assign total_cartprice = checkout.subtotal_price %}{% assign ratio = dtotal | divided_by: total_cartprice %}{% assign ratioless = 1 | minus: ratio %}{% assign final_item_price = item.price | times: ratioless %}{% if forloop.last == true %}{{ final_item_price | money_without_currency | remove: ',' }}{% else %}{{final_item_price | money_without_currency | remove: ',' | append: ','}}{% endif %}{% endfor %}';
       var orderQuantityList = '{% for item in checkout.line_items %}{% if forloop.last == true %}{{ item.quantity }}{% else %}{{ item.quantity | append: ','}}{% endif %}{% endfor %}';
       var orderCouponCode = '{% for discount in checkout.discounts %}{% if forloop.last == true %}{{ discount.code }}{% else %}{{ discount.code | append: ',' }}{% endif %}{% endfor %}';                                    
